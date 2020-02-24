@@ -1,0 +1,2 @@
+include ':app', ':state-machine-lib'
+rootProject.name='StateMachine'

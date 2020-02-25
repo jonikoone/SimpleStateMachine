@@ -47,16 +47,17 @@ abstract class IState(vararg val distancesState: KClass<out IState>) {
 interface IStateMachine : CoroutineScope {
 
     var currentState: IState
+    val logger: StateMachineLogger
 
     /**
     * change current state on klassState if validate is true
     * @param klassState
     * */
     fun nextStep(klassState: KClass<out IState>) {
-        Log.e("State machine", "goto navigate: ${klassState.simpleName}")
+        logger.logI("goto navigate: ${klassState.simpleName}")
         if (currentState.hasNextStep(klassState)) {
             currentState = klassState.objectInstance!!
-            Log.e("klassInfo", "${klassState.simpleName}:$currentState")
+            logger.logI("${klassState.simpleName}:$currentState")
             launch(Dispatchers.Main) {
                 currentState.stateAction?.invokeAction()
             }
@@ -67,5 +68,25 @@ interface IStateMachine : CoroutineScope {
     * starting first state in state machine
     * */
     fun initStateMachineAsync() = nextStep(currentState::class)
+
+    interface StateMachineLogger {
+        fun logI(message: String)
+        fun logD(message: String)
+        fun logE(message: String, throwable: Throwable? = null)
+    }
 }
 
+class DefaultStateMachineLogger(val tagLogger: String = "StateMachine:Log->") : IStateMachine.StateMachineLogger {
+    override fun logI(message: String) {
+        Log.i(tagLogger, message)
+    }
+
+    override fun logD(message: String) {
+        Log.d(tagLogger, message)
+    }
+
+    override fun logE(message: String, throwable: Throwable?) {
+        Log.e(tagLogger, message, throwable)
+    }
+
+}

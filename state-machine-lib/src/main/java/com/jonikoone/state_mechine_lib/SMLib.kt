@@ -52,7 +52,7 @@ interface IStateMachine : CoroutineScope {
     /**
      * flag anti-restart state machine
      * */
-    var startStateMachine: Boolean
+    var startStateMachine: StartStateMachine
 
     /**
      * change current state on klassState if validate is true
@@ -87,9 +87,9 @@ interface IStateMachine : CoroutineScope {
     }
 
     fun initStateMachineSingle() {
-        if (startStateMachine) {
+        if (startStateMachine == StartStateMachine.Start) {
             initStateMachine()
-            startStateMachine = !startStateMachine
+            startStateMachine = StartStateMachine.Started
         }
     }
 }
@@ -98,3 +98,14 @@ class MissNextStateThrowable(kclassState: KClass<out IState>) : Throwable(
     message = "Your don`t change to %s state, because current state don`t contains this next state. Add distancesState in initialize your states."
         .format(kclassState)
 )
+
+class StartStateMachine(val stateStart: Int) {
+    companion object {
+        val Start = StartStateMachine(0)
+        val Started = StartStateMachine(1)
+    }
+}
+
+
+
+

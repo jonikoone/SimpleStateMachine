@@ -1,23 +1,23 @@
 package com.jonikoone.state_mechine_lib
 
-import android.util.Log
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import kotlin.reflect.KClass
 
 /**
  * abstract class for extends in concrete State
  * @param distancesState distances states
  * */
-abstract class IState(vararg val distancesState: KClass<out IState>) {
-
+abstract class IState(
+    vararg val distancesState: KClass<out IState>
+) {
     /**
      * validate next state on current state
-     * @param klassState next state
+     * @param kclassState next state
      * @return true if state contains in possible states
      * */
-    fun hasNextStep(klassState: KClass<out IState>) = distancesState.contains(klassState)
+    fun hasNextStep(kclassState: KClass<out IState>) = distancesState.contains(kclassState)
 
     /*
     * this is it, that do work within set currentState
@@ -42,51 +42,59 @@ abstract class IState(vararg val distancesState: KClass<out IState>) {
 
 
 /**
-* context states
-* */
+ * context states
+ * */
 interface IStateMachine : CoroutineScope {
-
+    /**
+     * first state
+     * */
     var currentState: IState
-    val logger: StateMachineLogger
+    /**
+     * flag anti-restart state machine
+     * */
+    var startStateMachine: Boolean
 
     /**
-    * change current state on klassState if validate is true
-    * @param klassState
-    * */
-    fun nextStep(klassState: KClass<out IState>) {
-        logger.logI("goto navigate: ${klassState.simpleName}")
-        if (currentState.hasNextStep(klassState)) {
-            currentState = klassState.objectInstance!!
-            logger.logI("${klassState.simpleName}:$currentState")
-            launch(Dispatchers.Main) {
+     * change current state on klassState if validate is true
+     * @param kclassState
+     * */
+    fun nextStep(kclassState: KClass<out IState>) {
+        Timber.d("try change current state to %s", kclassState.qualifiedName)
+        if (currentState.hasNextStep(kclassState)) {
+            currentState = kclassState.objectInstance!!
+            Timber.d("current state changed to %s", currentState::class.qualifiedName)
+            launch {
                 currentState.stateAction?.invokeAction()
             }
+        } else {
+            val error = MissNextStateThrowable(kclassState)
+            Timber.e(error)
         }
     }
 
     /**
-    * starting first state in state machine
-    * */
-    fun initStateMachineAsync() = nextStep(currentState::class)
+     * starting first state in state machine
+     * */
+    fun initStateMachine() {
+        Timber.d(
+            "start state machine, try invoke action in current state: %s",
+            currentState::class.qualifiedName
+        )
+        launch {
+            currentState.stateAction?.invokeAction()
+            Timber.d("started state machine ")
+        }
+    }
 
-    interface StateMachineLogger {
-        fun logI(message: String)
-        fun logD(message: String)
-        fun logE(message: String, throwable: Throwable? = null)
+    fun initStateMachineSingle() {
+        if (startStateMachine) {
+            initStateMachine()
+            startStateMachine = !startStateMachine
+        }
     }
 }
 
-class DefaultStateMachineLogger(val tagLogger: String = "StateMachine:Log->") : IStateMachine.StateMachineLogger {
-    override fun logI(message: String) {
-        Log.i(tagLogger, message)
-    }
-
-    override fun logD(message: String) {
-        Log.d(tagLogger, message)
-    }
-
-    override fun logE(message: String, throwable: Throwable?) {
-        Log.e(tagLogger, message, throwable)
-    }
-
-}
+class MissNextStateThrowable(kclassState: KClass<out IState>) : Throwable(
+    message = "Your don`t change to %s state, because current state don`t contains this next state. Add distancesState in initialize your states."
+        .format(kclassState)
+)

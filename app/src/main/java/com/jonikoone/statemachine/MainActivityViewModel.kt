@@ -3,23 +3,17 @@ package com.jonikoone.statemachine
 import android.view.View
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
+import com.jonikoone.state_mechine_lib.DefaultStateMachine
 import com.jonikoone.state_mechine_lib.IState
 import com.jonikoone.state_mechine_lib.IStateMachine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.coroutines.CoroutineContext
-import kotlin.reflect.KClass
+import kotlinx.coroutines.withContext
 
 class MainActivityViewModel : ViewModel(),
-    IStateMachine {
+    IStateMachine by DefaultStateMachine(MyState.Load) {
 
-    override val coroutineContext: CoroutineContext
-        get() = Dispatchers.Main
-
-    override var startStateMachine = true
-
-    var loadedData: String? = null
     //show
     val mainText = MutableLiveData<String>("main text")
     //load
@@ -42,11 +36,15 @@ class MainActivityViewModel : ViewModel(),
             visibleProgress.value = View.VISIBLE
             enabledReloadBtn.value = false
             updateBtnText.value = "Download Data..."
-
             launch(Dispatchers.IO) {
                 try {
-                    delay(1000)
-                    loadedData = "loaded data"
+                    (10 downTo 0).forEach {
+                        withContext(Dispatchers.Main) {
+                            mainText.value = "loaded data - $it"
+                        }
+                        delay(1000)
+                    }
+
                     nextStep(MyState.Show::class)
                 } catch (e: Exception) {
                     nextStep(MyState.ErrorLoad::class)
@@ -56,9 +54,7 @@ class MainActivityViewModel : ViewModel(),
 
         MyState.Show.initAction {
             updateBtnText.value = "Reload"
-            loadedData?.let {
-                mainText.value = it
-            }
+            mainText.value = "compete"
             visibleProgress.value = View.GONE
             enabledReloadBtn.value = true
         }
@@ -92,10 +88,9 @@ class MainActivityViewModel : ViewModel(),
 *
 * */
 
-sealed class MyState(vararg val possibleState: KClass<out IState>) :
-    IState(*possibleState) {
-    object Load : MyState(Show::class, ErrorLoad::class)
-    object Show : MyState(Reload::class)
-    object Reload : MyState(Load::class)
-    object ErrorLoad : MyState(Reload::class)
+sealed class MyState {
+    object Load : IState(Show::class, ErrorLoad::class)
+    object Show : IState(Reload::class)
+    object Reload : IState(Load::class)
+    object ErrorLoad : IState(Reload::class)
 }
